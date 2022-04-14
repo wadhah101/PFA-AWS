@@ -8,6 +8,8 @@ import {
 import { IRepository } from "aws-cdk-lib/aws-ecr";
 import { Construct } from "constructs";
 
+const ELASTIC_VERSION = "8.1.2";
+
 interface Props extends StackProps {
   suffix: string;
   kibanaRepo: IRepository;
@@ -60,7 +62,7 @@ export class PipelineConstruct extends Construct {
             "cd elasticsearch",
             "echo Build started on `date`",
             "echo Building the Docker image...",
-            "docker build -t $IMAGE_NAME:latest .",
+            "docker build -t $IMAGE_NAME:latest --build-arg ELASTIC_VERSION=$ELASTIC_VERSION .",
             "docker tag $IMAGE_NAME:latest $REPOSITORY_URI:$IMAGE_TAG",
             "docker tag $IMAGE_NAME:latest $REPOSITORY_URI:latest",
           ],
@@ -77,7 +79,7 @@ export class PipelineConstruct extends Construct {
         },
       },
       artifacts: {
-        files: "imagedefinitions.json",
+        files: "elasticsearch/imagedefinitions.json",
       },
     }),
   });
@@ -89,11 +91,15 @@ export class PipelineConstruct extends Construct {
     outputs: [new codepipeline.Artifact("Build")],
     environmentVariables: {
       ECR_REPO: {
-        value: this.props.kibanaRepo.repositoryUri,
+        value: this.props.elasticRepo.repositoryUri,
         type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
       },
       IMAGE_NAME: {
-        value: this.props.kibanaRepo.repositoryName,
+        value: this.props.elasticRepo.repositoryName,
+        type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+      },
+      ELASTIC_VERSION: {
+        value: ELASTIC_VERSION,
         type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
       },
 
