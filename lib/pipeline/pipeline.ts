@@ -5,6 +5,7 @@ interface Props extends StackProps {
   suffix: string;
 }
 
+// TODO pipeline to copy config to efs on push and restart the cluster and to build dockerfiles
 export class PipelineConstruct extends Construct {
   constructor(scope: Construct, id: string, private props: Props) {
     super(scope, id);

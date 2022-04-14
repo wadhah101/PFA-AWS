@@ -1,8 +1,17 @@
-import { Stack, StackProps, aws_s3 as s3, aws_ecr as ecr } from "aws-cdk-lib";
+import {
+  Stack,
+  StackProps,
+  aws_ecr as ecr,
+  aws_efs as efs,
+  aws_ec2 as ec2,
+  RemovalPolicy,
+} from "aws-cdk-lib";
+import { IVpc } from "aws-cdk-lib/aws-ec2";
 import { Construct } from "constructs";
 
 interface Props extends StackProps {
   suffix: string;
+  efsVPC: IVpc;
 }
 
 export class StorageConstruct extends Construct {
@@ -10,13 +19,21 @@ export class StorageConstruct extends Construct {
     super(scope, id);
   }
 
-  kibanaRepo = new ecr.Repository(this, "kibanaRepo", {
+  public kibanaRepo = new ecr.Repository(this, "kibanaRepo", {
     repositoryName: `kibana-pfa-${this.props.suffix}`,
   });
-  elasticRepo = new ecr.Repository(this, "elasticRepo", {
+  public elasticRepo = new ecr.Repository(this, "elasticRepo", {
     repositoryName: `elastic-pfa-${this.props.suffix}`,
   });
-  logstashRepo = new ecr.Repository(this, "logstashRepo", {
+  public logstashRepo = new ecr.Repository(this, "logstashRepo", {
     repositoryName: `logstash-pfa-${this.props.suffix}`,
+  });
+
+  public fileSystem = new efs.FileSystem(this, "MyEfsFileSystem", {
+    fileSystemName: `elk-filesystem-${this.props.suffix}`,
+    removalPolicy: RemovalPolicy.DESTROY,
+    vpc: this.props.efsVPC,
+    performanceMode: efs.PerformanceMode.GENERAL_PURPOSE, // default
+    outOfInfrequentAccessPolicy: efs.OutOfInfrequentAccessPolicy.AFTER_1_ACCESS, // files are not transitioned back from (infrequent access) IA to primary storage by default
   });
 }

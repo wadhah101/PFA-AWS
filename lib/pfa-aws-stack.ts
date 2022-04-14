@@ -14,16 +14,17 @@ export class PfaAwsStack extends Stack {
     super(scope, id, props);
   }
 
-  storage = new StorageConstruct(this, "Storage", {
-    suffix: this.props.suffix,
-  });
-
   pipeline = new PipelineConstruct(this, "Pipeline", {
     suffix: this.props.suffix,
   });
 
   network = new NetworkConstruct(this, "Network", {
     suffix: this.props.suffix,
+  });
+
+  storage = new StorageConstruct(this, "Storage", {
+    suffix: this.props.suffix,
+    efsVPC: this.network.elksClusterVPC,
   });
 
   cluster = new ClusterConstruct(this, "Cluster", {
