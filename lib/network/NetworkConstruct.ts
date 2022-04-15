@@ -21,12 +21,12 @@ export class NetworkConstruct extends Construct {
     maxAzs: 3,
   });
 
-  private cloudfrontELK = new cloudfront.Distribution(this, "cloudfrontELK", {
-    comment:
-      "The distribution that bill used with ELK stack to collect logs and connect",
-    defaultBehavior: {
-      origin: new origins.HttpOrigin("www.facebook.com"),
-      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
-    },
-  });
+  // private cloudfrontELK = new cloudfront.Distribution(this, "cloudfrontELK", {
+  //   comment:
+  //     "The distribution that bill used with ELK stack to collect logs and connect",
+  //   defaultBehavior: {
+  //     origin: new origins.HttpOrigin("www.facebook.com"),
+  //     cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+  //   },
+  // });
 }

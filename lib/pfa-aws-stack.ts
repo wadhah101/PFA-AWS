@@ -28,9 +28,15 @@ export class PfaAwsStack extends Stack {
     elasticRepo: this.storage.elasticRepo,
     kibanaRepo: this.storage.kibanaRepo,
     logstashRepo: this.storage.logstashRepo,
+    efsVPC: this.network.elksClusterVPC,
+    configEFS: this.storage.fileSystem,
   });
 
   cluster = new ClusterConstruct(this, "Cluster", {
     suffix: this.props.suffix,
+    elasticRepo: this.storage.elasticRepo,
+    elkVPC: this.network.elksClusterVPC,
+    kibanaRepo: this.storage.kibanaRepo,
+    logstashRepo: this.storage.logstashRepo,
   });
 }

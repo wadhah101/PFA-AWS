@@ -4,7 +4,10 @@ import {
   aws_codepipeline as codepipeline,
   aws_codebuild as codebuild,
   aws_codepipeline_actions as actions,
+  FileSystem,
+  aws_efs,
 } from "aws-cdk-lib";
+import { IVpc } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
 import { Construct } from "constructs";
 
@@ -12,6 +15,8 @@ const ELASTIC_VERSION = "8.1.2";
 
 interface Props extends StackProps {
   suffix: string;
+  efsVPC: IVpc;
+  configEFS: aws_efs.FileSystem;
   kibanaRepo: IRepository;
   elasticRepo: IRepository;
   logstashRepo: IRepository;
@@ -23,6 +28,8 @@ export class PipelineConstruct extends Construct {
   constructor(scope: Construct, id: string, private props: Props) {
     super(scope, id);
     this.props.elasticRepo.grantPullPush(this.CodeBuildProject);
+
+    // this.props.configEFS.grant(this.CopyConfigFile);
   }
 
   private elkCodeCommit = codecommit.Repository.fromRepositoryArn(
