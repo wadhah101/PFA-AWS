@@ -49,7 +49,7 @@ export class PipelineConstruct extends Construct {
     environment: {
       privileged: true,
       buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
-      computeType: codebuild.ComputeType.LARGE,
+      computeType: codebuild.ComputeType.MEDIUM,
     },
     buildSpec: codebuild.BuildSpec.fromObject({
       version: 0.2,
