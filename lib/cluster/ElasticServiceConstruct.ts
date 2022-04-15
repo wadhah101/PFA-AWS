@@ -105,8 +105,9 @@ export class ElasticServiceConstruct extends Construct {
     // healthCheckGracePeriod: Duration.days(1),
     taskDefinition: this.elasticTaskDef,
     assignPublicIp: true,
+    serviceName: "elasticsearch",
     securityGroups: [this.elasticSecurityGroup],
-    desiredCount: 1,
+    desiredCount: 0,
     cloudMapOptions: {
       name: "elastic",
       cloudMapNamespace: this.props.discoveryNameSpace,

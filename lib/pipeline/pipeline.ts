@@ -10,6 +10,7 @@ import {
 import { IVpc } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
 import { Construct } from "constructs";
+import { containerCodeBuild } from "./buildspecECR";
 
 const ELASTIC_VERSION = "8.1.2";
 
@@ -22,14 +23,11 @@ interface Props extends StackProps {
   logstashRepo: IRepository;
 }
 
-// TODO pipeline to copy config to efs on push and restart the cluster
-// TODO build docker images on pipeline and upload to ecr
 export class PipelineConstruct extends Construct {
   constructor(scope: Construct, id: string, private props: Props) {
     super(scope, id);
-    this.props.elasticRepo.grantPullPush(this.CodeBuildProject);
-
-    // this.props.configEFS.grant(this.CopyConfigFile);
+    this.props.elasticRepo.grantPullPush(this.elasticCodeBuildProject);
+    this.props.kibanaRepo.grantPullPush(this.kibanaCodeBuildProject);
   }
 
   private elkCodeCommit = codecommit.Repository.fromRepositoryArn(
@@ -45,57 +43,38 @@ export class PipelineConstruct extends Construct {
     branch: "master",
   });
 
-  CodeBuildProject = new codebuild.PipelineProject(this, "CodeBuildProject", {
-    environment: {
-      privileged: true,
-      buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
-      computeType: codebuild.ComputeType.MEDIUM,
-    },
-    buildSpec: codebuild.BuildSpec.fromObject({
-      version: 0.2,
-      phases: {
-        pre_build: {
-          commands: [
-            "echo Logging in to Amazon ECR...",
-            "aws --version",
-            "aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_REPO",
-            "REPOSITORY_URI=${ECR_REPO}",
-            "COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)",
-            "IMAGE_TAG=${COMMIT_HASH:=latest}",
-          ],
-        },
-        build: {
-          commands: [
-            "cd elasticsearch",
-            "echo Build started on `date`",
-            "echo Building the Docker image...",
-            "docker build -t $IMAGE_NAME:latest --build-arg ELASTIC_VERSION=$ELASTIC_VERSION .",
-            "docker tag $IMAGE_NAME:latest $REPOSITORY_URI:$IMAGE_TAG",
-            "docker tag $IMAGE_NAME:latest $REPOSITORY_URI:latest",
-          ],
-        },
-        post_build: {
-          commands: [
-            "echo Build completed on `date`",
-            "echo Pushing the Docker images...",
-            "docker push $REPOSITORY_URI:latest",
-            "docker push $REPOSITORY_URI:$IMAGE_TAG",
-            "echo Writing image definitions file...",
-            'printf \'[{"name":"%s","imageUri":"%s"}]\' $SERVICE_CONTAINER_NAME $REPOSITORY_URI:$IMAGE_TAG  > imagedefinitions.json',
-          ],
-        },
+  elasticCodeBuildProject = new codebuild.PipelineProject(
+    this,
+    "CodeBuildProject",
+    {
+      environment: {
+        privileged: true,
+        buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
+        computeType: codebuild.ComputeType.MEDIUM,
       },
-      artifacts: {
-        files: "elasticsearch/imagedefinitions.json",
-      },
-    }),
-  });
+      buildSpec: containerCodeBuild("elasticsearch"),
+    }
+  );
 
-  private codeBuildAction = new actions.CodeBuildAction({
-    actionName: "BuildContainer",
-    project: this.CodeBuildProject,
+  kibanaCodeBuildProject = new codebuild.PipelineProject(
+    this,
+    "KibanaCodeBuildProject",
+    {
+      environment: {
+        privileged: true,
+        buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
+        computeType: codebuild.ComputeType.MEDIUM,
+      },
+      buildSpec: containerCodeBuild("kibana"),
+    }
+  );
+
+  private elasticCodeBuildAction = new actions.CodeBuildAction({
+    actionName: "BuildElasticContainer",
+    runOrder: 1,
+    project: this.elasticCodeBuildProject,
     input: new codepipeline.Artifact("Source"),
-    outputs: [new codepipeline.Artifact("Build")],
+    outputs: [new codepipeline.Artifact("BuildElastic")],
     environmentVariables: {
       ECR_REPO: {
         value: this.props.elasticRepo.repositoryUri,
@@ -117,11 +96,46 @@ export class PipelineConstruct extends Construct {
     },
   });
 
+  private kibanaCodeBuildAction = new actions.CodeBuildAction({
+    actionName: "BuildKibanaContainer",
+    runOrder: 1,
+    project: this.kibanaCodeBuildProject,
+    input: new codepipeline.Artifact("Source"),
+    outputs: [new codepipeline.Artifact("BuildKibana")],
+    environmentVariables: {
+      // TODO use proper service discovery name
+      ELASTIC_SEARCH_HOST: {
+        value: "elastic.elk.dev",
+        type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+      },
+      ECR_REPO: {
+        value: this.props.kibanaRepo.repositoryUri,
+        type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+      },
+      IMAGE_NAME: {
+        value: this.props.kibanaRepo.repositoryName,
+        type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+      },
+      ELASTIC_VERSION: {
+        value: ELASTIC_VERSION,
+        type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+      },
+
+      SERVICE_CONTAINER_NAME: {
+        value: "todo", // this.container.containerName,
+        type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+      },
+    },
+  });
+
   private buildImagePipeline = new codepipeline.Pipeline(this, "BuildDocker", {
     pipelineName: `build-elk-docker-${this.props.suffix}`,
     stages: [
       { stageName: "source", actions: [this.sourceActions] },
-      { stageName: "build", actions: [this.codeBuildAction] },
+      {
+        stageName: "build",
+        actions: [this.elasticCodeBuildAction, this.kibanaCodeBuildAction],
+      },
     ],
   });
 }
