@@ -11,13 +11,17 @@ import {
 } from "aws-cdk-lib";
 import { IVpc } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
-import { DnsRecordType } from "aws-cdk-lib/aws-servicediscovery";
+import {
+  DnsRecordType,
+  PrivateDnsNamespace,
+} from "aws-cdk-lib/aws-servicediscovery";
 
 interface Props {
   suffix: string;
   cluster: ICluster;
   elkVPC: IVpc;
   elasticRepo: IRepository;
+  discoveryNameSpace: PrivateDnsNamespace;
 }
 
 export class ElasticServiceConstruct extends Construct {
@@ -95,10 +99,6 @@ export class ElasticServiceConstruct extends Construct {
     }
   );
 
-  dnsNamespace = new servicediscovery.PublicDnsNamespace(this, "DnsNamespace", {
-    name: "demo.wadhah",
-    description: "Private DnsNamespace for my Microservices",
-  });
   // _cat/health
   public elasticService = new ecs.FargateService(this, "Service", {
     cluster: this.props.cluster,
@@ -109,8 +109,7 @@ export class ElasticServiceConstruct extends Construct {
     desiredCount: 1,
     cloudMapOptions: {
       name: "elastic",
-      cloudMapNamespace: this.dnsNamespace,
-      containerPort: 9200,
+      cloudMapNamespace: this.props.discoveryNameSpace,
       dnsRecordType: DnsRecordType.A,
     },
   });

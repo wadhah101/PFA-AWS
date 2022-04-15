@@ -27,6 +27,16 @@ export class ClusterConstruct extends Construct {
     vpc: this.props.elkVPC,
   });
 
+  elkClusterNameSpace = new servicediscovery.PrivateDnsNamespace(
+    this,
+    "ElkNamespacee",
+    {
+      name: `elk.${this.props.suffix}`,
+      vpc: this.props.elkVPC,
+      description: "Private DnsNamespace for my Microservices",
+    }
+  );
+
   elasticServiceConstruct = new ElasticServiceConstruct(
     this,
     "elasticService",
@@ -35,6 +45,7 @@ export class ClusterConstruct extends Construct {
       elasticRepo: this.props.elasticRepo,
       elkVPC: this.props.elkVPC,
       suffix: this.props.suffix,
+      discoveryNameSpace: this.elkClusterNameSpace,
     }
   );
 }
