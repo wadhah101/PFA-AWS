@@ -44,18 +44,10 @@ export class KibanaServiceConstruct extends Construct {
     this.kibanaTaskDef.addToExecutionRolePolicy(executionRolePolicy);
     this.props.kibanaRepo.grantPull(this.kibanaTaskRole);
 
-    // SECURITY GROUPS
-    // TODO sepecify more
-    this.kibanaSecurityGroup.addIngressRule(
-      ec2.Peer.anyIpv4(),
-      ec2.Port.allTcp(),
-      "Open ingress from anywhere"
-    );
-
     // service
 
     this.kibanaService.targetGroup.configureHealthCheck({
-      path: "/",
+      path: "/api/status",
       enabled: true,
     });
   }
@@ -83,30 +75,22 @@ export class KibanaServiceConstruct extends Construct {
     portMappings: [{ containerPort: 5601, protocol: ecs.Protocol.TCP }],
     environment: {
       KIBANA_SYSTEM_PASSWORD: "changeme",
+      // TODO make elastic port configurable from variable
+      ELASTICSEARCH_HOST: `elastic.${this.props.discoveryNameSpace.namespaceName}:9200`,
     },
     essential: true,
   });
-
-  private kibanaSecurityGroup = new ec2.SecurityGroup(
-    this,
-    `Kibana-security-group`,
-    {
-      vpc: this.props.elkVPC,
-      allowAllOutbound: true,
-      description: "kibana Security Group",
-    }
-  );
 
   public kibanaService = new ecs_patterns.ApplicationLoadBalancedFargateService(
     this,
     "KibanaService",
     {
-      serviceName: "Kibana-ALB",
+      serviceName: "Kibana",
       cluster: this.props.cluster,
       taskDefinition: this.kibanaTaskDef,
       assignPublicIp: true,
       publicLoadBalancer: true,
-      desiredCount: 1,
+      // desiredCount: 0,
       cloudMapOptions: {
         name: "kibana",
         cloudMapNamespace: this.props.discoveryNameSpace,

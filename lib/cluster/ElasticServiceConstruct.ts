@@ -107,7 +107,7 @@ export class ElasticServiceConstruct extends Construct {
     assignPublicIp: true,
     serviceName: "elasticsearch",
     securityGroups: [this.elasticSecurityGroup],
-    desiredCount: 0,
+    // desiredCount: 0,
     cloudMapOptions: {
       name: "elastic",
       cloudMapNamespace: this.props.discoveryNameSpace,

@@ -52,11 +52,11 @@ export class ClusterConstruct extends Construct {
     }
   );
 
-  // kibanaService = new KibanaServiceConstruct(this, "kibanservice", {
-  //   cluster: this.elkCluster,
-  //   discoveryNameSpace: this.elkClusterNameSpace,
-  //   elkVPC: this.props.elkVPC,
-  //   kibanaRepo: this.props.kibanaRepo,
-  //   suffix: this.props.suffix,
-  // });
+  kibanaService = new KibanaServiceConstruct(this, "kibanservice", {
+    cluster: this.elkCluster,
+    discoveryNameSpace: this.elkClusterNameSpace,
+    elkVPC: this.props.elkVPC,
+    kibanaRepo: this.props.kibanaRepo,
+    suffix: this.props.suffix,
+  });
 }
