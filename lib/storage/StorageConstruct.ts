@@ -4,7 +4,6 @@ import {
   aws_ecr as ecr,
   aws_efs as efs,
   aws_s3 as s3,
-  aws_ec2 as ec2,
   RemovalPolicy,
 } from "aws-cdk-lib";
 import { IVpc } from "aws-cdk-lib/aws-ec2";

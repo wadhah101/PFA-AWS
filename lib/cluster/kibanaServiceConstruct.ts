@@ -97,21 +97,6 @@ export class KibanaServiceConstruct extends Construct {
     }
   );
 
-  // _cat/health
-  // public kibanaService = new ecs.FargateService(this, "KibanaService", {
-  //   cluster: this.props.cluster,
-  //   // healthCheckGracePeriod: Duration.days(1),
-  //   taskDefinition: this.kibanaTaskDef,
-  //   assignPublicIp: true,
-  //   securityGroups: [this.kibanaSecurityGroup],
-  //   desiredCount: 1,
-  //   cloudMapOptions: {
-  //     name: "kibana",
-  //     cloudMapNamespace: this.props.discoveryNameSpace,
-  //     dnsRecordType: DnsRecordType.A,
-  //   },
-  // });
-
   public kibanaService = new ecs_patterns.ApplicationLoadBalancedFargateService(
     this,
     "KibanaService",
