@@ -28,6 +28,7 @@ export class PipelineConstruct extends Construct {
     super(scope, id);
     this.props.elasticRepo.grantPullPush(this.elasticCodeBuildProject);
     this.props.kibanaRepo.grantPullPush(this.kibanaCodeBuildProject);
+    this.props.logstashRepo.grantPullPush(this.logstashCodeBuildProject);
   }
 
   private elkCodeCommit = codecommit.Repository.fromRepositoryArn(
@@ -69,6 +70,19 @@ export class PipelineConstruct extends Construct {
     }
   );
 
+  logstashCodeBuildProject = new codebuild.PipelineProject(
+    this,
+    "logstashCodeBuildProject",
+    {
+      environment: {
+        privileged: true,
+        buildImage: codebuild.LinuxBuildImage.STANDARD_5_0,
+        computeType: codebuild.ComputeType.MEDIUM,
+      },
+      buildSpec: containerCodeBuild("logstash"),
+    }
+  );
+
   private elasticCodeBuildAction = new actions.CodeBuildAction({
     actionName: "BuildElasticContainer",
     runOrder: 1,
@@ -103,11 +117,6 @@ export class PipelineConstruct extends Construct {
     input: new codepipeline.Artifact("Source"),
     outputs: [new codepipeline.Artifact("BuildKibana")],
     environmentVariables: {
-      // TODO use proper service discovery name
-      ELASTIC_SEARCH_HOST: {
-        value: "elastic.elk.dev",
-        type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
-      },
       ECR_REPO: {
         value: this.props.kibanaRepo.repositoryUri,
         type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
@@ -128,13 +137,44 @@ export class PipelineConstruct extends Construct {
     },
   });
 
+  private logstashCodeBuildAction = new actions.CodeBuildAction({
+    actionName: "BuildLogstashContainer",
+    runOrder: 1,
+    project: this.logstashCodeBuildProject,
+    input: new codepipeline.Artifact("Source"),
+    outputs: [new codepipeline.Artifact("BuildLogstash")],
+    environmentVariables: {
+      ECR_REPO: {
+        value: this.props.logstashRepo.repositoryUri,
+        type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+      },
+      IMAGE_NAME: {
+        value: this.props.logstashRepo.repositoryName,
+        type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+      },
+      ELASTIC_VERSION: {
+        value: ELASTIC_VERSION,
+        type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+      },
+
+      SERVICE_CONTAINER_NAME: {
+        value: "todo", // this.container.containerName,
+        type: codebuild.BuildEnvironmentVariableType.PLAINTEXT,
+      },
+    },
+  });
+
   private buildImagePipeline = new codepipeline.Pipeline(this, "BuildDocker", {
     pipelineName: `build-elk-docker-${this.props.suffix}`,
     stages: [
       { stageName: "source", actions: [this.sourceActions] },
       {
         stageName: "build",
-        actions: [this.elasticCodeBuildAction, this.kibanaCodeBuildAction],
+        actions: [
+          this.elasticCodeBuildAction,
+          this.kibanaCodeBuildAction,
+          this.logstashCodeBuildAction,
+        ],
       },
     ],
   });

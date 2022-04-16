@@ -7,6 +7,7 @@ import {
   RemovalPolicy,
 } from "aws-cdk-lib";
 import { IVpc } from "aws-cdk-lib/aws-ec2";
+import { ThroughputMode } from "aws-cdk-lib/aws-efs";
 import { Construct } from "constructs";
 
 interface Props extends StackProps {

@@ -21,12 +21,12 @@ interface Props {
   suffix: string;
   cluster: ICluster;
   elkVPC: IVpc;
-  elasticRepo: IRepository;
+  logstashRepo: IRepository;
   discoveryNameSpace: PrivateDnsNamespace;
   elkVolume: FileSystem;
 }
 
-export class ElasticServiceConstruct extends Construct {
+export class LogstashServiceConstruct extends Construct {
   constructor(scope: Construct, id: string, private props: Props) {
     super(scope, id);
 
@@ -43,26 +43,22 @@ export class ElasticServiceConstruct extends Construct {
       ],
     });
 
-    this.elasticTaskDef.addToExecutionRolePolicy(executionRolePolicy);
-    this.props.elasticRepo.grantPull(this.elasticTaskRole);
+    this.logstashTaskDef.addToExecutionRolePolicy(executionRolePolicy);
+    this.props.logstashRepo.grantPull(this.logstashTaskRole);
 
-    //  TODO limit this
-    this.props.elkVolume.connections.allowToAnyIpv4(ec2.Port.allTraffic());
-    this.props.elkVolume.connections.allowFromAnyIpv4(ec2.Port.allTraffic());
-
-    this.elasticService.connections.allowToAnyIpv4(ec2.Port.allTraffic());
-    this.elasticService.connections.allowFromAnyIpv4(ec2.Port.allTraffic());
+    this.logstashService.connections.allowToAnyIpv4(ec2.Port.allTraffic());
+    this.logstashService.connections.allowFromAnyIpv4(ec2.Port.allTraffic());
   }
-  private elasticLogging = new ecs.AwsLogDriver({
-    streamPrefix: `elastic-logs-${this.props.suffix}`,
+  private logstashLogging = new ecs.AwsLogDriver({
+    streamPrefix: `logstash-logs-${this.props.suffix}`,
   });
 
-  private elasticTaskRole = new iam.Role(this, `ecs-taskRole`, {
+  private logstashTaskRole = new iam.Role(this, `ecs-taskRole`, {
     assumedBy: new iam.ServicePrincipal(ServicePrincipals.ECS_TASKS),
   });
 
-  private elasticTaskDef = new ecs.FargateTaskDefinition(this, "ecs-taskdef", {
-    taskRole: this.elasticTaskRole,
+  private logstashTaskDef = new ecs.FargateTaskDefinition(this, "ecs-taskdef", {
+    taskRole: this.logstashTaskRole,
     cpu: 1024,
     memoryLimitMiB: 4096,
     volumes: [
@@ -80,37 +76,35 @@ export class ElasticServiceConstruct extends Construct {
     },
   });
 
-  private elasticContainer = this.elasticTaskDef.addContainer(
-    "ElasticContainer",
+  private logstashContainer = this.logstashTaskDef.addContainer(
+    "logstashContainer",
     {
       image: ecs.ContainerImage.fromRegistry(
-        this.props.elasticRepo.repositoryUri
+        this.props.logstashRepo.repositoryUri
       ),
-      logging: this.elasticLogging,
+      logging: this.logstashLogging,
       portMappings: [
-        { containerPort: 9200, protocol: ecs.Protocol.TCP },
-        { containerPort: 9300, protocol: ecs.Protocol.TCP },
+        { containerPort: 5044, protocol: ecs.Protocol.TCP },
+        { containerPort: 5000, protocol: ecs.Protocol.TCP },
+        { containerPort: 5000, protocol: ecs.Protocol.UDP },
+        { containerPort: 9600, protocol: ecs.Protocol.TCP },
       ],
       environment: {
-        ELASTIC_PASSWORD: "changeme",
-        "discovery.type": "single-node",
+        LOGSTASH_PASSWORD: "changeme",
+        ELASTICSEARCH_HOST: `elastic.${this.props.discoveryNameSpace.namespaceName}:9200`,
       },
-
       essential: true,
     }
   );
 
-  // _cat/health
-  public elasticService = new ecs.FargateService(this, "Service", {
+  public logstashService = new ecs.FargateService(this, "Service", {
     cluster: this.props.cluster,
-    // healthCheckGracePeriod: Duration.days(1),
-    taskDefinition: this.elasticTaskDef,
-    circuitBreaker: { rollback: true },
+    taskDefinition: this.logstashTaskDef,
     assignPublicIp: true,
-    serviceName: "elasticsearch2",
-    // desiredCount: 0,
+    circuitBreaker: { rollback: true },
+    serviceName: "logstash",
     cloudMapOptions: {
-      name: "elastic",
+      name: "logstash",
       cloudMapNamespace: this.props.discoveryNameSpace,
       dnsRecordType: DnsRecordType.A,
     },

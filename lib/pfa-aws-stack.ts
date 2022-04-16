@@ -37,6 +37,7 @@ export class PfaAwsStack extends Stack {
     elasticRepo: this.storage.elasticRepo,
     elkVPC: this.network.elksClusterVPC,
     kibanaRepo: this.storage.kibanaRepo,
+    elkVolume: this.storage.fileSystem,
     logstashRepo: this.storage.logstashRepo,
   });
 }

@@ -6,9 +6,12 @@ import {
 } from "aws-cdk-lib";
 import { IVpc } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
+import { FileSystem } from "aws-cdk-lib/aws-efs";
+import { NamespaceType } from "aws-cdk-lib/aws-servicediscovery";
 import { Construct } from "constructs";
 import { ElasticServiceConstruct } from "./ElasticServiceConstruct";
 import { KibanaServiceConstruct } from "./kibanaServiceConstruct";
+import { LogstashServiceConstruct } from "./LogstashConstruct";
 
 interface Props {
   suffix: string;
@@ -16,6 +19,7 @@ interface Props {
   logstashRepo: IRepository;
   kibanaRepo: IRepository;
   elkVPC: IVpc;
+  elkVolume: FileSystem;
 }
 
 const desiredTasks = 1;
@@ -47,6 +51,7 @@ export class ClusterConstruct extends Construct {
       cluster: this.elkCluster,
       elasticRepo: this.props.elasticRepo,
       elkVPC: this.props.elkVPC,
+      elkVolume: this.props.elkVolume,
       suffix: this.props.suffix,
       discoveryNameSpace: this.elkClusterNameSpace,
     }
@@ -57,6 +62,15 @@ export class ClusterConstruct extends Construct {
     discoveryNameSpace: this.elkClusterNameSpace,
     elkVPC: this.props.elkVPC,
     kibanaRepo: this.props.kibanaRepo,
+    suffix: this.props.suffix,
+  });
+
+  logStashService = new LogstashServiceConstruct(this, "logstash", {
+    cluster: this.elkCluster,
+    discoveryNameSpace: this.elkClusterNameSpace,
+    elkVPC: this.props.elkVPC,
+    elkVolume: this.props.elkVolume,
+    logstashRepo: this.props.logstashRepo,
     suffix: this.props.suffix,
   });
 }

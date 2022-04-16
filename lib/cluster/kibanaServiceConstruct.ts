@@ -61,8 +61,8 @@ export class KibanaServiceConstruct extends Construct {
 
   private kibanaTaskDef = new ecs.FargateTaskDefinition(this, "ecs-taskdef", {
     taskRole: this.kibanaTaskRole,
-    cpu: 2048,
-    memoryLimitMiB: 4096,
+    cpu: 1024,
+    memoryLimitMiB: 2048,
     runtimePlatform: {
       cpuArchitecture: ecs.CpuArchitecture.X86_64,
       operatingSystemFamily: ecs.OperatingSystemFamily.LINUX,
@@ -85,10 +85,11 @@ export class KibanaServiceConstruct extends Construct {
     this,
     "KibanaService",
     {
-      serviceName: "Kibana",
+      serviceName: "Kibana2",
       cluster: this.props.cluster,
       taskDefinition: this.kibanaTaskDef,
       assignPublicIp: true,
+      circuitBreaker: { rollback: true },
       publicLoadBalancer: true,
       // desiredCount: 0,
       cloudMapOptions: {
