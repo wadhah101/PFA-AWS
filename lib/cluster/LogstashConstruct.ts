@@ -85,11 +85,11 @@ export class LogstashServiceConstruct extends Construct {
     );
 
     // CONTAINER CONFIG
-    this.logstashContainer.addMountPoints({
-      containerPath: "/usr/share/logstash/pipeline",
-      readOnly: false,
-      sourceVolume: "logstashPipelines",
-    });
+    // this.logstashContainer.addMountPoints({
+    //   containerPath: "/usr/share/logstash/pipeline",
+    //   readOnly: false,
+    //   sourceVolume: "logstashPipelines",
+    // });
 
     // TODO remove debug only
     this.logstashService.connections.allowToAnyIpv4(ec2.Port.allTraffic());

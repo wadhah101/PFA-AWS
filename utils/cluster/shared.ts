@@ -23,5 +23,10 @@ export const changeDevClusterDesiredCount = async (desiredCount: number) => {
 
   const requests = await Promise.all(commands!!.map((e) => client.send(e)));
 
-  console.log(requests);
+  console.log(
+    requests.map(({ service }) => ({
+      serviceName: service?.serviceName,
+      desiredCount: service?.desiredCount,
+    }))
+  );
 };
