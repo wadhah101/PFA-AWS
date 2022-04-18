@@ -9,13 +9,14 @@ import {
   aws_ecs_patterns as ecs_patterns,
   Duration,
 } from "aws-cdk-lib";
-import { IVpc } from "aws-cdk-lib/aws-ec2";
+import { IVpc, Port } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
 import {
   DnsRecordType,
   PrivateDnsNamespace,
 } from "aws-cdk-lib/aws-servicediscovery";
 import { FileSystem } from "aws-cdk-lib/aws-efs";
+import { RetentionDays } from "aws-cdk-lib/aws-logs";
 
 interface Props {
   suffix: string;
@@ -28,25 +29,27 @@ interface Props {
 
 export class ElasticServiceConstruct extends Construct {
   // THIS IS SO IMPORTANT
-  private elasticAccessPoint = this.props.elkVolume.addAccessPoint("ok", {
-    path: "/elastic",
-    posixUser: {
-      uid: "1000",
-      gid: "1000",
-    },
-    createAcl: {
-      ownerGid: "1000",
-      ownerUid: "1000",
-      permissions: "755",
-    },
-  });
+  private elasticAccessPoint = this.props.elkVolume.addAccessPoint(
+    "ElasticSearchDataAccessPoint",
+    {
+      path: "/elastic",
+      posixUser: {
+        uid: "1000",
+        gid: "1000",
+      },
+      createAcl: {
+        ownerGid: "1000",
+        ownerUid: "1000",
+        permissions: "755",
+      },
+    }
+  );
 
   constructor(scope: Construct, id: string, private props: Props) {
     super(scope, id);
 
     const executionRolePolicy = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
-      // TODO limit
       resources: ["*"],
       actions: [
         "ecr:GetAuthorizationToken",
@@ -59,20 +62,30 @@ export class ElasticServiceConstruct extends Construct {
     });
 
     this.elasticTaskDef.addToExecutionRolePolicy(executionRolePolicy);
-
-    // TODO test without this
-    this.elasticTaskDef.addToTaskRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["*"],
-        resources: ["*"],
-      })
-    );
     this.props.elasticRepo.grantPull(this.elasticTaskRole);
 
-    //  TODO limit this
-    this.props.elkVolume.connections.allowToAnyIpv4(ec2.Port.allTraffic());
-    this.props.elkVolume.connections.allowFromAnyIpv4(ec2.Port.allTraffic());
+    // IMPROVEMENT limit filesystem access to folder
+    this.props.elkVolume.grant(this.elasticTaskRole, "*");
 
+    this.props.elkVolume.connections.allowTo(
+      this.elasticService,
+      Port.tcp(2049)
+    );
+    this.props.elkVolume.connections.allowFrom(
+      this.elasticService,
+      Port.tcp(2049)
+    );
+
+    this.elasticService.connections.allowFrom(
+      this.props.elkVolume,
+      Port.tcp(2049)
+    );
+    this.elasticService.connections.allowTo(
+      this.props.elkVolume,
+      Port.tcp(2049)
+    );
+
+    // TODO remove in future and allow just kibana and logstash
     this.elasticService.connections.allowToAnyIpv4(ec2.Port.allTraffic());
     this.elasticService.connections.allowFromAnyIpv4(ec2.Port.allTraffic());
 
@@ -85,6 +98,7 @@ export class ElasticServiceConstruct extends Construct {
   }
   private elasticLogging = new ecs.AwsLogDriver({
     streamPrefix: `elastic-logs-${this.props.suffix}`,
+    logRetention: RetentionDays.THREE_DAYS,
   });
 
   private elasticTaskRole = new iam.Role(this, `ecs-taskRole`, {
@@ -136,9 +150,8 @@ export class ElasticServiceConstruct extends Construct {
   public elasticService = new ecs.FargateService(this, "Service", {
     cluster: this.props.cluster,
     taskDefinition: this.elasticTaskDef,
-    circuitBreaker: { rollback: true },
     assignPublicIp: true,
-    serviceName: "elasticsearch2",
+    serviceName: "elasticsearch",
     cloudMapOptions: {
       name: "elastic",
       cloudMapNamespace: this.props.discoveryNameSpace,

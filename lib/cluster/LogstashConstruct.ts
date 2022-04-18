@@ -9,7 +9,7 @@ import {
   aws_ecs_patterns as ecs_patterns,
   Duration,
 } from "aws-cdk-lib";
-import { IVpc } from "aws-cdk-lib/aws-ec2";
+import { IVpc, Port } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
 import {
   DnsRecordType,
@@ -27,6 +27,23 @@ interface Props {
 }
 
 export class LogstashServiceConstruct extends Construct {
+  // THIS IS SO IMPORTANT
+  private logstashAccessPoint = this.props.elkVolume.addAccessPoint(
+    "LogstashSearchDataAccessPoint",
+    {
+      path: "/logstash",
+      posixUser: {
+        uid: "1000",
+        gid: "1000",
+      },
+      createAcl: {
+        ownerGid: "1000",
+        ownerUid: "1000",
+        permissions: "755",
+      },
+    }
+  );
+
   constructor(scope: Construct, id: string, private props: Props) {
     super(scope, id);
 
@@ -46,6 +63,35 @@ export class LogstashServiceConstruct extends Construct {
     this.logstashTaskDef.addToExecutionRolePolicy(executionRolePolicy);
     this.props.logstashRepo.grantPull(this.logstashTaskRole);
 
+    // IMPROVEMENT limit filesystem access to folder
+    this.props.elkVolume.grant(this.logstashTaskRole, "*");
+
+    this.props.elkVolume.connections.allowTo(
+      this.logstashService,
+      Port.tcp(2049)
+    );
+    this.props.elkVolume.connections.allowFrom(
+      this.logstashService,
+      Port.tcp(2049)
+    );
+
+    this.logstashService.connections.allowFrom(
+      this.props.elkVolume,
+      Port.tcp(2049)
+    );
+    this.logstashService.connections.allowTo(
+      this.props.elkVolume,
+      Port.tcp(2049)
+    );
+
+    // CONTAINER CONFIG
+    this.logstashContainer.addMountPoints({
+      containerPath: "/usr/share/logstash/pipeline",
+      readOnly: false,
+      sourceVolume: "logstashPipelines",
+    });
+
+    // TODO remove debug only
     this.logstashService.connections.allowToAnyIpv4(ec2.Port.allTraffic());
     this.logstashService.connections.allowFromAnyIpv4(ec2.Port.allTraffic());
   }
@@ -57,16 +103,20 @@ export class LogstashServiceConstruct extends Construct {
     assumedBy: new iam.ServicePrincipal(ServicePrincipals.ECS_TASKS),
   });
 
-  private logstashTaskDef = new ecs.FargateTaskDefinition(this, "ecs-taskdef", {
+  private logstashTaskDef = new ecs.FargateTaskDefinition(this, "ecs-taskDef", {
     taskRole: this.logstashTaskRole,
     cpu: 1024,
     memoryLimitMiB: 4096,
     volumes: [
       {
-        name: "data",
+        name: "logstashPipelines",
         efsVolumeConfiguration: {
           fileSystemId: this.props.elkVolume.fileSystemId,
-          rootDirectory: "/",
+          transitEncryption: "ENABLED",
+          authorizationConfig: {
+            accessPointId: this.logstashAccessPoint.accessPointId,
+            iam: "ENABLED",
+          },
         },
       },
     ],

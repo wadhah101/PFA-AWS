@@ -85,7 +85,7 @@ export class KibanaServiceConstruct extends Construct {
     this,
     "KibanaService",
     {
-      serviceName: "Kibana2",
+      serviceName: "Kibana",
       cluster: this.props.cluster,
       taskDefinition: this.kibanaTaskDef,
       assignPublicIp: true,

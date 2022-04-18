@@ -4,7 +4,7 @@ import {
   aws_cloudfront_origins as origins,
   aws_servicediscovery as servicediscovery,
 } from "aws-cdk-lib";
-import { IVpc } from "aws-cdk-lib/aws-ec2";
+import { IVpc, Port } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
 import { FileSystem } from "aws-cdk-lib/aws-efs";
 import { NamespaceType } from "aws-cdk-lib/aws-servicediscovery";
@@ -27,6 +27,16 @@ const desiredTasks = 1;
 export class ClusterConstruct extends Construct {
   constructor(scope: Construct, id: string, private props: Props) {
     super(scope, id);
+
+    this.logStashService.logstashService.connections.allowTo(
+      this.elasticServiceConstruct.elasticService,
+      Port.allTraffic()
+    );
+
+    this.logStashService.logstashService.connections.allowFrom(
+      this.elasticServiceConstruct.elasticService,
+      Port.allTraffic()
+    );
   }
 
   elkCluster = new ecs.Cluster(this, "ecs-cluster", {
