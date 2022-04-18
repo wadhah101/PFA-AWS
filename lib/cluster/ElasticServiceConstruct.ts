@@ -27,11 +27,26 @@ interface Props {
 }
 
 export class ElasticServiceConstruct extends Construct {
+  // THIS IS SO IMPORTANT
+  private elasticAccessPoint = this.props.elkVolume.addAccessPoint("ok", {
+    path: "/elastic",
+    posixUser: {
+      uid: "1000",
+      gid: "1000",
+    },
+    createAcl: {
+      ownerGid: "1000",
+      ownerUid: "1000",
+      permissions: "755",
+    },
+  });
+
   constructor(scope: Construct, id: string, private props: Props) {
     super(scope, id);
 
     const executionRolePolicy = new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
+      // TODO limit
       resources: ["*"],
       actions: [
         "ecr:GetAuthorizationToken",
@@ -44,6 +59,14 @@ export class ElasticServiceConstruct extends Construct {
     });
 
     this.elasticTaskDef.addToExecutionRolePolicy(executionRolePolicy);
+
+    // TODO test without this
+    this.elasticTaskDef.addToTaskRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["*"],
+        resources: ["*"],
+      })
+    );
     this.props.elasticRepo.grantPull(this.elasticTaskRole);
 
     //  TODO limit this
@@ -52,6 +75,13 @@ export class ElasticServiceConstruct extends Construct {
 
     this.elasticService.connections.allowToAnyIpv4(ec2.Port.allTraffic());
     this.elasticService.connections.allowFromAnyIpv4(ec2.Port.allTraffic());
+
+    // CONTAINER CONFIG
+    this.elasticContainer.addMountPoints({
+      containerPath: "/usr/share/elasticsearch/data",
+      readOnly: false,
+      sourceVolume: "elasticData",
+    });
   }
   private elasticLogging = new ecs.AwsLogDriver({
     streamPrefix: `elastic-logs-${this.props.suffix}`,
@@ -61,16 +91,20 @@ export class ElasticServiceConstruct extends Construct {
     assumedBy: new iam.ServicePrincipal(ServicePrincipals.ECS_TASKS),
   });
 
-  private elasticTaskDef = new ecs.FargateTaskDefinition(this, "ecs-taskdef", {
+  private elasticTaskDef = new ecs.FargateTaskDefinition(this, "ecs-taskef", {
     taskRole: this.elasticTaskRole,
     cpu: 1024,
     memoryLimitMiB: 4096,
     volumes: [
       {
-        name: "data",
+        name: "elasticData",
         efsVolumeConfiguration: {
           fileSystemId: this.props.elkVolume.fileSystemId,
-          rootDirectory: "/",
+          transitEncryption: "ENABLED",
+          authorizationConfig: {
+            accessPointId: this.elasticAccessPoint.accessPointId,
+            iam: "ENABLED",
+          },
         },
       },
     ],
@@ -95,20 +129,16 @@ export class ElasticServiceConstruct extends Construct {
         ELASTIC_PASSWORD: "changeme",
         "discovery.type": "single-node",
       },
-
       essential: true,
     }
   );
 
-  // _cat/health
   public elasticService = new ecs.FargateService(this, "Service", {
     cluster: this.props.cluster,
-    // healthCheckGracePeriod: Duration.days(1),
     taskDefinition: this.elasticTaskDef,
     circuitBreaker: { rollback: true },
     assignPublicIp: true,
     serviceName: "elasticsearch2",
-    // desiredCount: 0,
     cloudMapOptions: {
       name: "elastic",
       cloudMapNamespace: this.props.discoveryNameSpace,
