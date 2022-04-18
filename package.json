@@ -8,7 +8,9 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "cdk": "cdk"
+    "cdk": "cdk",
+    "cluster-dev:up": "ts-node  utils/cluster/up.ts ",
+    "cluster-dev:down": "ts-node  utils/cluster/down.ts "
   },
   "devDependencies": {
     "@types/jest": "^27.4.1",
