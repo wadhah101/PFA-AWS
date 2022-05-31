@@ -6,8 +6,10 @@ import {
   aws_ecs as ecs,
   aws_ec2 as ec2,
   aws_servicediscovery as servicediscovery,
+  aws_route53 as route53,
   aws_ecs_patterns as ecs_patterns,
   Duration,
+  aws_certificatemanager,
 } from "aws-cdk-lib";
 import { IVpc } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
@@ -75,16 +77,28 @@ export class KibanaServiceConstruct extends Construct {
     portMappings: [{ containerPort: 5601, protocol: ecs.Protocol.TCP }],
     environment: {
       KIBANA_SYSTEM_PASSWORD: "changeme",
-      // TODO make elastic port configurable from variable
       ELASTICSEARCH_HOST: `elastic.${this.props.discoveryNameSpace.namespaceName}:9200`,
     },
     essential: true,
+  });
+
+  public certificate = aws_certificatemanager.Certificate.fromCertificateArn(
+    this,
+    "certificate",
+    "arn:aws:acm:eu-west-3:316616769018:certificate/b397177c-771c-4656-8de0-0d091866edaf"
+  );
+
+  private hostedZone = new route53.PublicHostedZone(this, "HostedZone", {
+    zoneName: "kibana.pfasoc.online",
   });
 
   public kibanaService = new ecs_patterns.ApplicationLoadBalancedFargateService(
     this,
     "KibanaService",
     {
+      domainZone: this.hostedZone,
+      certificate: this.certificate,
+      domainName: "kibana.pfasoc.online",
       serviceName: "Kibana",
       cluster: this.props.cluster,
       taskDefinition: this.kibanaTaskDef,
@@ -97,7 +111,6 @@ export class KibanaServiceConstruct extends Construct {
         cloudMapNamespace: this.props.discoveryNameSpace,
         dnsRecordType: DnsRecordType.A,
       },
-      listenerPort: 80,
     }
   );
 }
