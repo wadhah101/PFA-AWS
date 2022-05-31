@@ -8,6 +8,8 @@ import {
   aws_servicediscovery as servicediscovery,
   aws_ecs_patterns as ecs_patterns,
   Duration,
+  aws_certificatemanager,
+  aws_route53,
 } from "aws-cdk-lib";
 import { IVpc, Port } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
@@ -147,16 +149,28 @@ export class LogstashServiceConstruct extends Construct {
     }
   );
 
-  public logstashService = new ecs.FargateService(this, "Service", {
-    cluster: this.props.cluster,
-    taskDefinition: this.logstashTaskDef,
-    assignPublicIp: true,
-    circuitBreaker: { rollback: true },
-    serviceName: "logstash",
-    cloudMapOptions: {
-      name: "logstash",
-      cloudMapNamespace: this.props.discoveryNameSpace,
-      dnsRecordType: DnsRecordType.A,
-    },
+  private hostedZone = new aws_route53.PublicHostedZone(this, "HostedZone", {
+    zoneName: "logstash.pfasoc.online",
   });
+
+  public logstashServiceALB =
+    new ecs_patterns.ApplicationLoadBalancedFargateService(this, "Service", {
+      domainZone: this.hostedZone,
+      domainName: "logstash.pfasoc.online",
+      cluster: this.props.cluster,
+      taskDefinition: this.logstashTaskDef,
+      openListener: true,
+      assignPublicIp: true,
+      circuitBreaker: { rollback: true },
+      serviceName: "logstash",
+      cloudMapOptions: {
+        name: "logstash",
+        cloudMapNamespace: this.props.discoveryNameSpace,
+        dnsRecordType: DnsRecordType.A,
+      },
+
+      publicLoadBalancer: true,
+    });
+
+  public logstashService = this.logstashServiceALB.service;
 }
