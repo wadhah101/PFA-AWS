@@ -8,6 +8,8 @@ import {
   aws_servicediscovery as servicediscovery,
   aws_ecs_patterns as ecs_patterns,
   Duration,
+  aws_certificatemanager,
+  aws_route53,
 } from "aws-cdk-lib";
 import { IVpc, Port } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
@@ -147,15 +149,37 @@ export class ElasticServiceConstruct extends Construct {
     }
   );
 
-  public elasticService = new ecs.FargateService(this, "Service", {
-    cluster: this.props.cluster,
-    taskDefinition: this.elasticTaskDef,
-    assignPublicIp: true,
-    serviceName: "elasticsearch",
-    cloudMapOptions: {
-      name: "elastic",
-      cloudMapNamespace: this.props.discoveryNameSpace,
-      dnsRecordType: DnsRecordType.A,
-    },
+  public certificate = aws_certificatemanager.Certificate.fromCertificateArn(
+    this,
+    "certificate",
+    "arn:aws:acm:eu-west-3:316616769018:certificate/e53526a6-527f-400b-a725-aa9af2601c7f"
+  );
+
+  private hostedZone = new aws_route53.PublicHostedZone(this, "HostedZone", {
+    zoneName: "elastic.pfasoc.online",
   });
+
+  public elasticALB = new ecs_patterns.ApplicationLoadBalancedFargateService(
+    this,
+    "elasticService",
+    {
+      domainZone: this.hostedZone,
+      certificate: this.certificate,
+      domainName: "elastic.pfasoc.online",
+      serviceName: "elasticsearch",
+      openListener: true,
+      cluster: this.props.cluster,
+      taskDefinition: this.elasticTaskDef,
+      assignPublicIp: true,
+      circuitBreaker: { rollback: true },
+      publicLoadBalancer: true,
+      // desiredCount: 0,
+      cloudMapOptions: {
+        name: "elastic",
+        cloudMapNamespace: this.props.discoveryNameSpace,
+        dnsRecordType: DnsRecordType.A,
+      },
+    }
+  );
+  public elasticService = this.elasticALB.service;
 }
