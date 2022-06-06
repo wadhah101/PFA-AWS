@@ -38,8 +38,8 @@ export class StorageConstruct extends Construct {
     removalPolicy: RemovalPolicy.DESTROY,
   });
 
-  public fileSystem = new efs.FileSystem(this, "MyEfsFileSystemO", {
-    fileSystemName: `elk-filesystem-${this.props.suffix}-t`,
+  public fileSystem = new efs.FileSystem(this, "MyEfsFileSystem", {
+    fileSystemName: `elk-filesystem-${this.props.suffix}`,
     removalPolicy: RemovalPolicy.DESTROY,
     vpc: this.props.efsVPC,
     performanceMode: efs.PerformanceMode.GENERAL_PURPOSE, // default

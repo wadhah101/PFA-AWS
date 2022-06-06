@@ -149,6 +149,12 @@ export class LogstashServiceConstruct extends Construct {
     }
   );
 
+  public certificate = aws_certificatemanager.Certificate.fromCertificateArn(
+    this,
+    "certificate",
+    "arn:aws:acm:eu-west-3:316616769018:certificate/901d86a7-b60b-4546-b9aa-d79d7316bcf1"
+  );
+
   private hostedZone = new aws_route53.PublicHostedZone(this, "HostedZone", {
     zoneName: "logstash.pfasoc.online",
   });
@@ -156,6 +162,7 @@ export class LogstashServiceConstruct extends Construct {
   public logstashServiceALB =
     new ecs_patterns.ApplicationLoadBalancedFargateService(this, "Service", {
       domainZone: this.hostedZone,
+      certificate: this.certificate,
       domainName: "logstash.pfasoc.online",
       cluster: this.props.cluster,
       taskDefinition: this.logstashTaskDef,

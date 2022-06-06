@@ -12,7 +12,7 @@ import { IRepository } from "aws-cdk-lib/aws-ecr";
 import { Construct } from "constructs";
 import { containerCodeBuild } from "./buildspecECR";
 
-const ELASTIC_VERSION = "7.17.4";
+const ELASTIC_VERSION = "8.1.2";
 
 interface Props extends StackProps {
   suffix: string;

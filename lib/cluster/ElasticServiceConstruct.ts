@@ -164,10 +164,11 @@ export class ElasticServiceConstruct extends Construct {
     "elasticService",
     {
       domainZone: this.hostedZone,
-      certificate: this.certificate,
+      // certificate: this.certificate,
       domainName: "elastic.pfasoc.online",
       serviceName: "elasticsearch",
       openListener: true,
+      listenerPort: 9200,
       cluster: this.props.cluster,
       taskDefinition: this.elasticTaskDef,
       assignPublicIp: true,
